@@ -210,153 +210,33 @@
         });
 
         /**
-         * Gemini APIを呼び出してマイルストーンを生成する関数
+         * APIを呼び出してマイルストーンを生成する関数
          * @param {string} skillName - 習得したいスキル名
          * @param {string} goal - 最終的なゴール
          * @returns {Promise<Array<object>>} - 生成されたマイルストーンの配列
          */
         async function generateMilestones(skillName, goal) {
-            // システムプロンプト
-            const systemPrompt = `あなたは学習スキルのマイルストーン設計の専門家です。ユーザーが入力したスキル名とゴールに基づいて、段階的な10個のマイルストーンを生成してください。
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ skillName, goal }),
+                });
 
-## マイルストーン設計の基本方針
-
-### レベル構成（1-10）
-
-- **Lv.1-3: 基礎技術の習得**
-    - 基本的な知識・ツールの理解
-    - 初歩的な実践・操作の習得
-    - 基礎固めとなる小さな成果物の作成
-- **Lv.4-6: 応用・実践**
-    - 実践的なプロジェクトの実行
-    - 複数の技術・知識の組み合わせ
-    - 他者からのフィードバック獲得
-- **Lv.7: コンテンツ化**
-    - 学んだ内容を他者に教えられる形に整理
-    - ブログ、動画、記事などでの情報発信
-    - 知識の体系化と可視化
-- **Lv.8-9: 商品化**
-    - サービス・商品として提供できる形に発展
-    - 市場のニーズと自分のスキルのマッチング
-    - プロトタイプやMVPの作成・テスト
-- **Lv.10: 収益化**
-    - 継続的な収益を生み出す仕組みの確立
-    - ビジネスモデルの構築と実行
-    - スケーラブルな収益源の創出
-
-## マイルストーン作成のガイドライン
-
-### 1. 具体性を重視
-- 「〜を学ぶ」ではなく「〜を使って○○を作る」
-- 「〜を理解する」ではなく「〜を実行して△△の結果を得る」
-- 定性的な達成基準を中心とし、必要に応じて数値目標を含める
-
-### 2. 段階性を保つ
-- 前のマイルストーンの成果を次のステップで活用
-- 難易度が急激に上がらないよう調整
-- 各レベルで明確な成長を実感できる設計
-
-### 3. 実践性を確保
-- 理論だけでなく必ず実践を含める
-- 作品・成果物の作成を重視
-- 外部への発信・共有を積極的に組み込む
-
-### 4. 数値目標の使い分け
-- **Lv.1-6**: 定性的な達成基準を中心（「理解できる」「作成できる」「習得する」）
-- **Lv.7-9**: 必要に応じて軽い数値目標（「数回実施」「複数の〜」など）
-- **Lv.10**: 明確な収益数値目標を必須設定
-
-### 4. 収益化への道筋
-- Lv.7以降は必ず収益化を意識した内容にする
-- 教える→商品化→収益化の流れを自然に組み込む
-- 市場価値のあるスキルへの発展を意識
-- 数値目標は全体で3個程度に抑制（主にLv.7以降で使用）
-
-## 注意事項
-- 各マイルストーンは独立して達成可能でありながら、全体として一貫した成長ストーリーを描く
-- 実現可能性と挑戦性のバランスを取る
-- 収益化については具体的で現実的な方法を提案する
-- ユーザーの入力したゴールと最終マイルストーン（Lv.10）が明確に繋がるようにする`;
-
-            // ユーザープロンプト
-            const userPrompt = `スキル名: ${skillName}\nゴール: ${goal}`;
-            
-            const chatHistory = [
-                { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
-            ];
-
-            const payload = {
-                contents: chatHistory,
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            milestones: {
-                                type: "ARRAY",
-                                items: {
-                                    type: "OBJECT",
-                                    properties: {
-                                        level: { type: "NUMBER" },
-                                        milestone: { type: "STRING" }
-                                    },
-                                    required: ["level", "milestone"]
-                                }
-                            }
-                        },
-                        required: ["milestones"]
-                    }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'API request failed');
                 }
-            };
-            
-            const apiKey = ""; // APIキーは空のままにします
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-            // 指数関数的バックオフを用いたリトライ処理
-            let response;
-            let attempts = 0;
-            const maxAttempts = 5;
-            let delay = 1000;
+                const data = await response.json();
+                return data.milestones;
 
-            while (attempts < maxAttempts) {
-                try {
-                    response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json();
-                        if (result.candidates && result.candidates.length > 0 &&
-                            result.candidates[0].content && result.candidates[0].content.parts &&
-                            result.candidates[0].content.parts.length > 0) {
-                            
-                            const jsonText = result.candidates[0].content.parts[0].text;
-                            const parsedJson = JSON.parse(jsonText);
-                            return parsedJson.milestones;
-                        }
-                    }
-                    // 429 (Too Many Requests) のようなエラーの場合リトライ
-                    if (response.status === 429 || response.status >= 500) {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                    } else {
-                        // その他のクライアントエラーはリトライしない
-                        const errorResult = await response.json();
-                        console.error("API Error:", errorResult);
-                        throw new Error("API request failed with non-retriable status.");
-                    }
-                } catch (error) {
-                    console.log(`Attempt ${attempts + 1} failed. Retrying in ${delay}ms...`);
-                    attempts++;
-                    if (attempts >= maxAttempts) {
-                        throw error;
-                    }
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // バックオフ時間を2倍にする
-                }
+            } catch (error) {
+                console.error('Error calling API:', error);
+                throw error;
             }
-             throw new Error("Max retries reached. Could not fetch data from API.");
         }
 
         /**
